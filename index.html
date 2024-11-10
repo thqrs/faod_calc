@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAOD Muscle Energy Calculator</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            text-align: center;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .form-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+        }
+        #calculate-btn {
+            background-color: #28a745;
+            color: white;
+            padding: 10px;
+            border: none;
+            margin-top: 20px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            border-radius: 4px;
+        }
+        #calculate-btn:hover {
+            background-color: #218838;
+        }
+        canvas {
+            margin-top: 40px;
+        }
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            #calculate-btn {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>FAOD Muscle Energy Calculator</h1>
+        <div class="form-section">
+            <h2>Personal Parameters</h2>
+            <label for="weight">Weight (kg):</label>
+            <input type="number" id="weight" placeholder="e.g., 70" min="1">
+
+            <label for="muscleMass">Muscle Mass (kg):</label>
+            <input type="number" id="muscleMass" placeholder="e.g., 30" min="1">
+
+            <label for="age">Age (years):</label>
+            <input type="number" id="age" placeholder="e.g., 30" min="1">
+
+            <label for="gender">Gender:</label>
+            <select id="gender">
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+            </select>
+        </div>
+
+        <div class="form-section">
+            <h2>Activity Parameters</h2>
+            <label for="activity">Type of Activity:</label>
+            <select id="activity">
+                <option value="walking">Walking (3 METs)</option>
+                <option value="jogging">Jogging (7 METs)</option>
+                <option value="running">Running (10 METs)</option>
+                <option value="cycling">Cycling (6 METs)</option>
+                <option value="swimming">Swimming (8 METs)</option>
+                <option value="other">Other (Specify MET)</option>
+            </select>
+
+            <div id="otherActivityDiv" style="display:none;">
+                <label for="otherMET">Enter MET value:</label>
+                <input type="number" id="otherMET" placeholder="e.g., 5" min="1">
+            </div>
+
+            <label for="duration">Duration (minutes):</label>
+            <input type="number" id="duration" placeholder="e.g., 60" min="1">
+        </div>
+
+        <div class="form-section">
+            <h2>Metabolic Parameters</h2>
+            <label for="faodType">Type of FAOD:</label>
+            <select id="faodType">
+                <option value="none">None</option>
+                <option value="cpt2">CPT2 Deficiency</option>
+                <option value="mcad">MCAD Deficiency</option>
+                <option value="vlcad">VLCAD Deficiency</option>
+                <option value="lchad">LCHAD Deficiency</option>
+                <!-- Add more FAOD types as needed -->
+            </select>
+
+            <label for="cpt2Activity">CPT2 Enzyme Activity (%):</label>
+            <input type="number" id="cpt2Activity" placeholder="e.g., 50" min="0" max="100">
+
+            <label for="carbsConsumed">Carbohydrates Consumed at Start (g):</label>
+            <input type="number" id="carbsConsumed" placeholder="e.g., 100" min="0">
+
+            <label for="glycogenStores">Estimated Glycogen Stores (g):</label>
+            <input type="number" id="glycogenStores" placeholder="e.g., 300" min="0">
+        </div>
+
+        <button id="calculate-btn">Calculate</button>
+
+        <canvas id="energyChart" width="800" height="400"></canvas>
+    </div>
+
+    <script>
+        // MET values for activities
+        const activityMETs = {
+            'walking': 3,
+            'jogging': 7,
+            'running': 10,
+            'cycling': 6,
+            'swimming': 8
+        };
+
+        // Default CPT2 enzyme activity based on FAOD type
+        const faodCPT2Defaults = {
+            'none': 100,
+            'cpt2': 50,      // Example value, adjust based on medical data
+            'mcad': 100,     // Assuming no impact
+            'vlcad': 100,    // Assuming no impact
+            'lchad': 100     // Assuming no impact
+            // Add more FAOD types as needed
+        };
+
+        // Show or hide the Other MET input field
+        document.getElementById('activity').addEventListener('change', function() {
+            if(this.value === 'other') {
+                document.getElementById('otherActivityDiv').style.display = 'block';
+            } else {
+                document.getElementById('otherActivityDiv').style.display = 'none';
+            }
+        });
+
+        // Set default CPT2 enzyme activity based on FAOD selection
+        document.getElementById('faodType').addEventListener('change', function() {
+            const faod = this.value;
+            const defaultCPT2 = faodCPT2Defaults[faod] || 100;
+            document.getElementById('cpt2Activity').value = defaultCPT2;
+        });
+
+        document.getElementById('faodType').dispatchEvent(new Event('change')); // Initialize on page load
+
+        // Calculate button event listener
+        document.getElementById('calculate-btn').addEventListener('click', function() {
+            // Get user inputs
+            const weight = parseFloat(document.getElementById('weight').value);
+            const muscleMass = parseFloat(document.getElementById('muscleMass').value);
+            const age = parseFloat(document.getElementById('age').value);
+            const gender = document.getElementById('gender').value;
+
+            const activity = document.getElementById('activity').value;
+            let met = activityMETs[activity];
+            if(activity === 'other') {
+                met = parseFloat(document.getElementById('otherMET').value);
+                if(isNaN(met) || met <= 0){
+                    alert("Please enter a valid MET value for the activity.");
+                    return;
+                }
+            }
+
+            const duration = parseFloat(document.getElementById('duration').value);
+            if(isNaN(duration) || duration <= 0){
+                alert("Please enter a valid duration in minutes.");
+                return;
+            }
+
+            const faodType = document.getElementById('faodType').value;
+            let cpt2Activity = parseFloat(document.getElementById('cpt2Activity').value);
+            if(isNaN(cpt2Activity) || cpt2Activity < 0 || cpt2Activity > 100){
+                alert("Please enter a valid CPT2 enzyme activity percentage (0-100).");
+                return;
+            }
+
+            const carbsConsumed = parseFloat(document.getElementById('carbsConsumed').value);
+            const glycogenStores = parseFloat(document.getElementById('glycogenStores').value);
+
+            // Basic validation
+            if(isNaN(weight) || weight <= 0){
+                alert("Please enter a valid weight.");
+                return;
+            }
+            if(isNaN(muscleMass) || muscleMass < 0){
+                alert("Please enter a valid muscle mass.");
+                return;
+            }
+            if(isNaN(age) || age <= 0){
+                alert("Please enter a valid age.");
+                return;
+            }
+            if(isNaN(carbsConsumed) || carbsConsumed < 0){
+                alert("Please enter a valid amount of carbohydrates consumed.");
+                return;
+            }
+            if(isNaN(glycogenStores) || glycogenStores < 0){
+                alert("Please enter a valid amount of glycogen stores.");
+                return;
+            }
+
+            // Calculations
+
+            // 1. Basal Metabolic Rate (Mifflin-St Jeor Equation)
+            // Assuming height is not provided, using average height based on gender
+            let height;
+            if(gender === 'male') {
+                height = 175; // cm
+            } else {
+                height = 162; // cm
+            }
+
+            let BMR;
+            if(gender === 'male') {
+                BMR = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+            } else {
+                BMR = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+            }
+
+            // 2. Calories Burned per Minute
+            const caloriesPerMinute = (met * 3.5 * weight) / 200;
+
+            // 3. Total Carb Energy Available
+            const totalCarbEnergy = (carbsConsumed + glycogenStores) * 4; // kcal
+
+            // 4. Fat Oxidation Capacity
+            // Assuming normal fat oxidation rate is 0.5 kcal/min during the activity
+            const normalFatOxidationRate = 0.5; // kcal/min, adjust as needed
+            const adjustedFatOxidationRate = normalFatOxidationRate * (cpt2Activity / 100);
+
+            // 5. Total Energy Available from Fats
+            const totalFatEnergy = adjustedFatOxidationRate * duration;
+
+            // 6. Total Energy Supply
+            const totalEnergySupply = totalCarbEnergy + totalFatEnergy;
+
+            // 7. Total Energy Demand
+            const totalEnergyDemand = caloriesPerMinute * duration;
+
+            // 8. Estimate Time to Muscle Pain
+            // We need to find the time when cumulative demand exceeds supply
+            // We'll simulate minute by minute
+            let cumulativeDemand = 0;
+            let cumulativeSupply = 0;
+            let timeToPain = null;
+            let labels = [];
+            let demandData = [];
+            let supplyData = [];
+
+            for(let minute = 1; minute <= duration; minute++) {
+                cumulativeDemand += caloriesPerMinute;
+                // Assume carbohydrates are used first
+                if(totalCarbEnergy > 0) {
+                    if(totalCarbEnergy >= caloriesPerMinute) {
+                        cumulativeSupply += caloriesPerMinute;
+                        totalCarbEnergy -= caloriesPerMinute;
+                    } else {
+                        cumulativeSupply += totalCarbEnergy;
+                        totalCarbEnergy = 0;
+                    }
+                }
+                // Then fats
+                if(adjustedFatOxidationRate > 0) {
+                    if(adjustedFatOxidationRate >= (caloriesPerMinute - (caloriesPerMinute - totalCarbEnergy))) {
+                        cumulativeSupply += adjustedFatOxidationRate;
+                    } else {
+                        cumulativeSupply += adjustedFatOxidationRate;
+                    }
+                }
+
+                labels.push(minute);
+                demandData.push(cumulativeDemand);
+                supplyData.push(cumulativeSupply);
+
+                if(!timeToPain && cumulativeSupply < cumulativeDemand){
+                    timeToPain = minute;
+                }
+            }
+
+            // If no deficit occurred within the duration
+            if(!timeToPain){
+                timeToPain = "Not reached within the duration";
+            }
+
+            // Display the result
+            alert(`Estimated time to muscle pain: ${timeToPain === "Not reached within the duration" ? timeToPain : timeToPain + " minutes"}`);
+
+            // Generate the graph
+            const ctx = document.getElementById('energyChart').getContext('2d');
+
+            // Destroy previous chart if exists
+            if(window.energyChartInstance){
+                window.energyChartInstance.destroy();
+            }
+
+            window.energyChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Cumulative Energy Demand (kcal)',
+                            data: demandData,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Cumulative Energy Supply (kcal)',
+                            data: supplyData,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: false,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Estimated Muscle Energy Decline Over Time'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time (minutes)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Energy (kcal)'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+        });
+    </script>
+
+</body>
+</html>
